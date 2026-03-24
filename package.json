@@ -1,5 +1,5 @@
 {
-  "name": "@xmccln/weichat-ilink-sdk",
+  "name": "@xmccln/wechat-ilink-sdk",
   "version": "1.0.2",
   "description": "Universal TypeScript SDK for WeChat messaging with zero external dependencies",
   "type": "module",

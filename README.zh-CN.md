@@ -1,4 +1,4 @@
-# @xmccln/weichat-ilink-sdk
+# @xmccln/wechat-ilink-sdk
 
 微信 iLink 协议的 TypeScript SDK。
 
@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-npm install @xmccln/weichat-ilink-sdk
+npm install @xmccln/wechat-ilink-sdk
 ```
 
 ## 默认配置
@@ -34,7 +34,7 @@ import {
   WeixinSDK,
   TokenAuthProvider,
   LogLevel,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 
 const sdk = new WeixinSDK({
   config: {
@@ -69,7 +69,7 @@ import {
   WeixinSDK,
   QrAuthProvider,
   ApiClient,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 
 const config = {
   baseUrl: 'https://ilinkai.weixin.qq.com',
@@ -104,7 +104,7 @@ sdk.onMessage(async (message) => {
 ## 发送媒体
 
 ```ts
-import { UploadMediaType } from '@xmccln/weichat-ilink-sdk';
+import { UploadMediaType } from '@xmccln/wechat-ilink-sdk';
 
 await sdk.messaging.sender.sendMedia({
   to: 'target-user-id',
@@ -208,7 +208,7 @@ import {
   LogLevel,
   WeixinSDKError,
   ErrorCode,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 ```
 
 ## 配置项

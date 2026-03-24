@@ -1,4 +1,4 @@
-# @xmccln/weichat-ilink-sdk
+# @xmccln/wechat-ilink-sdk
 
 TypeScript SDK for the WeChat iLink bot protocol.
 
@@ -14,7 +14,7 @@ It includes:
 ## Install
 
 ```bash
-npm install @xmccln/weichat-ilink-sdk
+npm install @xmccln/wechat-ilink-sdk
 ```
 
 ## Quick Start
@@ -24,7 +24,7 @@ import {
   WeixinSDK,
   TokenAuthProvider,
   LogLevel,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 
 const sdk = new WeixinSDK({
   config: {
@@ -65,7 +65,7 @@ import {
   WeixinSDK,
   QrAuthProvider,
   ApiClient,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 
 const config = {
   baseUrl: 'https://ilinkai.weixin.qq.com',
@@ -100,7 +100,7 @@ sdk.onMessage(async (message) => {
 ## Sending Media
 
 ```ts
-import { UploadMediaType } from '@xmccln/weichat-ilink-sdk';
+import { UploadMediaType } from '@xmccln/wechat-ilink-sdk';
 
 await sdk.messaging.sender.sendMedia({
   to: 'target-user-id',
@@ -204,7 +204,7 @@ import {
   LogLevel,
   WeixinSDKError,
   ErrorCode,
-} from '@xmccln/weichat-ilink-sdk';
+} from '@xmccln/wechat-ilink-sdk';
 ```
 
 ## Config
