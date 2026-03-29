@@ -44,6 +44,9 @@ export interface GetUploadUrlResp {
   upload_param?: string;
   /** 缩略图上传加密参数，无缩略图时为空 */
   thumb_upload_param?: string;
+  /** iLink v2.1+ returns this full CDN URL instead of upload_param */
+  upload_full_url?: string;
+  thumb_upload_full_url?: string;
 }
 
 export const MessageType = {

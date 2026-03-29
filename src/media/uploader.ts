@@ -33,7 +33,12 @@ export class MediaUploader {
       aeskey: aesKey,
     });
 
-    const uploadParam = uploadUrlResp.upload_param;
+    let uploadParam = uploadUrlResp.upload_param;
+    if (!uploadParam && uploadUrlResp.upload_full_url) {
+      // iLink v2.1+ returns upload_full_url instead of upload_param
+      const url = new URL(uploadUrlResp.upload_full_url);
+      uploadParam = url.searchParams.get('encrypted_query_param') ?? undefined;
+    }
     if (!uploadParam) {
       throw new Error('Failed to get upload URL');
     }

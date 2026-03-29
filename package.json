@@ -1,6 +1,6 @@
 {
   "name": "@xmccln/wechat-ilink-sdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Universal TypeScript SDK for WeChat messaging with zero external dependencies",
   "type": "module",
   "main": "./dist/index.cjs",
