@@ -9,6 +9,9 @@ import { MediaDownloader } from '../media/downloader.js';
 import type { WeixinConfig, AuthResult } from '../core/types.js';
 import type { AuthProvider } from '../auth/interfaces.js';
 import type { WeixinMessage } from '../api/types.js';
+import { UploadMediaType } from '../api/types.js';
+import { DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL } from './types.js';
+import type { DownloadMediaOptions, DownloadedMedia } from '../media/downloader.js';
 
 export interface WeixinSDKOptions {
   config: WeixinConfig;
@@ -28,7 +31,11 @@ export class WeixinSDK extends EventEmitter {
 
   constructor(options: WeixinSDKOptions) {
     super();
-    this.config = options.config;
+    this.config = {
+      baseUrl: DEFAULT_BASE_URL,
+      cdnBaseUrl: DEFAULT_CDN_BASE_URL,
+      ...options.config,
+    };
     this.auth = options.auth;
 
     this.logger = new Logger({
@@ -40,8 +47,8 @@ export class WeixinSDK extends EventEmitter {
     this.apiClient = new ApiClient(this.config);
     this.apiEndpoints = new ApiEndpoints(this.apiClient);
 
-    const uploader = new MediaUploader(this.apiEndpoints, this.config.cdnBaseUrl);
-    const downloader = new MediaDownloader(this.config.cdnBaseUrl);
+    const uploader = new MediaUploader(this.apiEndpoints, this.config.cdnBaseUrl!);
+    const downloader = new MediaDownloader(this.config.cdnBaseUrl!);
     const sender = new MessageSender(this.apiEndpoints, uploader);
     const receiver = new MessageReceiver(this.apiEndpoints);
 
@@ -120,6 +127,43 @@ export class WeixinSDK extends EventEmitter {
 
   async sendText(to: string, text: string, contextToken?: string): Promise<void> {
     await this.messaging.sender.sendText({ to, text, contextToken });
+  }
+
+  private static readonly MEDIA_TYPE_MAP: Record<string, number> = {
+    image: UploadMediaType.IMAGE,
+    video: UploadMediaType.VIDEO,
+    file: UploadMediaType.FILE,
+    voice: UploadMediaType.VOICE,
+  };
+
+  async sendMedia(
+    to: string,
+    filePath: string,
+    mediaType: 'image' | 'video' | 'file' | 'voice',
+    options?: { text?: string; fileName?: string; contextToken?: string },
+  ): Promise<void> {
+    const type = WeixinSDK.MEDIA_TYPE_MAP[mediaType];
+    await this.messaging.sender.sendMedia({ to, filePath, mediaType: type, text: options?.text, fileName: options?.fileName, contextToken: options?.contextToken });
+  }
+
+  async sendImage(to: string, filePath: string, options?: { text?: string; contextToken?: string }): Promise<void> {
+    await this.sendMedia(to, filePath, 'image', options);
+  }
+
+  async sendVideo(to: string, filePath: string, options?: { text?: string; contextToken?: string }): Promise<void> {
+    await this.sendMedia(to, filePath, 'video', options);
+  }
+
+  async sendFile(to: string, filePath: string, options?: { fileName?: string; contextToken?: string }): Promise<void> {
+    await this.sendMedia(to, filePath, 'file', options);
+  }
+
+  async sendVoice(to: string, filePath: string, options?: { contextToken?: string }): Promise<void> {
+    await this.sendMedia(to, filePath, 'voice', options);
+  }
+
+  async downloadMedia(message: WeixinMessage, options?: DownloadMediaOptions): Promise<DownloadedMedia | null> {
+    return this.media.downloader.downloadFirstMedia(message, options);
   }
 
   onMessage(listener: (message: WeixinMessage) => void): this {

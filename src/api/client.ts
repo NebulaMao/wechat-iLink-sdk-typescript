@@ -1,5 +1,5 @@
 import { WeixinSDKError, ErrorCode } from '../core/errors.js';
-import type { WeixinConfig } from '../core/types.js';
+import { type WeixinConfig, DEFAULT_BASE_URL } from '../core/types.js';
 import type { BaseInfo } from './types.js';
 
 export interface ApiRequestOptions {
@@ -44,7 +44,7 @@ export class ApiClient {
   async request<T>(options: ApiRequestOptions): Promise<ApiResponse<T>> {
     const { method, path, data, headers: customHeaders, timeout: customTimeout } = options;
 
-    const url = `${this.config.baseUrl}${path}`;
+    const url = `${this.config.baseUrl ?? DEFAULT_BASE_URL}${path}`;
     const timeout = customTimeout ?? this.config.timeout ?? 30000;
     const maxRetries = this.config.retries ?? 3;
 
@@ -52,7 +52,7 @@ export class ApiClient {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        await this.delay(this.calculateBackoff(attempt));
+        await new Promise(resolve => setTimeout(resolve, this.calculateBackoff(attempt)));
       }
 
       try {
@@ -163,9 +163,6 @@ export class ApiClient {
     return baseDelay * Math.pow(2, attempt);
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   private async safeParseJson(response: Response): Promise<unknown> {
     try {

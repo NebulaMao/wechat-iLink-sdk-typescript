@@ -227,3 +227,55 @@ export interface GetConfigReq {
   ilink_user_id?: string;
   context_token?: string;
 }
+
+export function getMessageText(message: WeixinMessage): string {
+  for (const item of message.item_list ?? []) {
+    if (item.type === MessageItemType.TEXT && item.text_item?.text) {
+      return item.text_item.text;
+    }
+    if (item.type === MessageItemType.VOICE && item.voice_item?.text) {
+      return item.voice_item.text;
+    }
+  }
+  return '';
+}
+
+/** Find the first MessageItem of the given media type that has a valid CDN reference. */
+export function findMediaItem(message: WeixinMessage, type: number): MessageItem | undefined {
+  return message.item_list?.find((item) => {
+    if (item.type !== type) return false;
+    switch (type) {
+      case MessageItemType.IMAGE: return Boolean(item.image_item?.media?.encrypt_query_param);
+      case MessageItemType.VIDEO: return Boolean(item.video_item?.media?.encrypt_query_param);
+      case MessageItemType.VOICE: return Boolean(item.voice_item?.media?.encrypt_query_param);
+      case MessageItemType.FILE: return Boolean(item.file_item?.media?.encrypt_query_param);
+      default: return false;
+    }
+  });
+}
+
+/** Check if message contains a specific media type with valid CDN reference. */
+export function hasMediaType(message: WeixinMessage, type: number): boolean {
+  return !!findMediaItem(message, type);
+}
+
+export function hasImage(message: WeixinMessage): boolean {
+  return hasMediaType(message, MessageItemType.IMAGE);
+}
+
+export function hasVideo(message: WeixinMessage): boolean {
+  return hasMediaType(message, MessageItemType.VIDEO);
+}
+
+export function hasVoice(message: WeixinMessage): boolean {
+  return hasMediaType(message, MessageItemType.VOICE);
+}
+
+export function hasFile(message: WeixinMessage): boolean {
+  return hasMediaType(message, MessageItemType.FILE);
+}
+
+/** Get the first file name from a message, if any. */
+export function getFileName(message: WeixinMessage): string | undefined {
+  return message.item_list?.find((item) => item.type === MessageItemType.FILE)?.file_item?.file_name;
+}

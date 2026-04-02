@@ -1,8 +1,9 @@
 export { WeixinSDK, type WeixinSDKOptions } from './core/client.js';
-export { type WeixinConfig, type ResolvedWeixinAccount, type AuthResult, LogLevel, type AccountConfig } from './core/types.js';
+export { type WeixinConfig, type ResolvedWeixinAccount, type AuthResult, LogLevel, type AccountConfig, DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL } from './core/types.js';
 export { WeixinSDKError, ErrorCode } from './core/errors.js';
 
 export { type AuthProvider, type QrAuthEvents, type QrCodeResponse, type QrCodeStatusResponse } from './auth/interfaces.js';
+export { FileTokenStore, type TokenStoreData } from './auth/token-store.js';
 export { TokenAuthProvider } from './auth/providers.js';
 export { QrAuthProvider } from './auth/qr-auth.js';
 

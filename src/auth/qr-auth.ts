@@ -1,7 +1,8 @@
 import type { AuthResult } from '../core/types.js';
 import { EventEmitter } from '../utils/event-emitter.js';
 import type { AuthProvider, QrAuthEvents, QrCodeResponse, QrCodeStatusResponse } from './interfaces.js';
-import type { ApiClient } from '../api/client.js';
+import { ApiClient } from '../api/client.js';
+import type { WeixinConfig } from '../core/types.js';
 
 const POLL_INTERVAL = 2000;
 const TIMEOUT = 480000;
@@ -16,6 +17,15 @@ export class QrAuthProvider extends EventEmitter implements AuthProvider {
     super();
     this.apiClient = apiClient;
     this.defaultBotType = defaultBotType ?? DEFAULT_BOT_TYPE;
+  }
+
+  /**
+   * Create a QrAuthProvider from a config object.
+   * This is the recommended way to create a QrAuthProvider —
+   * you don't need to manually create an ApiClient.
+   */
+  static fromConfig(config: WeixinConfig, defaultBotType?: string): QrAuthProvider {
+    return new QrAuthProvider(new ApiClient(config), defaultBotType);
   }
 
   async authenticate(): Promise<AuthResult> {
@@ -81,7 +91,7 @@ export class QrAuthProvider extends EventEmitter implements AuthProvider {
         this.emit('qr_scanned', { status });
       }
 
-      await this.delay(POLL_INTERVAL);
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
     }
   }
 
@@ -93,9 +103,6 @@ export class QrAuthProvider extends EventEmitter implements AuthProvider {
     return this.authResult;
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 }
 
 export type { QrAuthEvents };

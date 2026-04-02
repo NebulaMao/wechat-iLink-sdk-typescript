@@ -1,3 +1,9 @@
+/** Default iLink API base URL. */
+export const DEFAULT_BASE_URL = 'https://ilinkai.weixin.qq.com';
+
+/** Default CDN base URL for media upload/download. */
+export const DEFAULT_CDN_BASE_URL = 'https://novac2c.cdn.weixin.qq.com/c2c';
+
 export interface AccountConfig {
   accountId: string;
   token?: string;
@@ -8,8 +14,8 @@ export interface AccountConfig {
 }
 
 export interface WeixinConfig {
-  baseUrl: string;
-  cdnBaseUrl: string;
+  baseUrl?: string;
+  cdnBaseUrl?: string;
   timeout?: number;
   longPollTimeoutMs?: number;
   retries?: number;

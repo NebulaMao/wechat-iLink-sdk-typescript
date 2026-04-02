@@ -6,8 +6,15 @@ import {
   QrAuthProvider,
   TokenAuthProvider,
   ApiClient,
-  MessageItemType,
   UploadMediaType,
+  DEFAULT_BASE_URL,
+  DEFAULT_CDN_BASE_URL,
+  getMessageText,
+  hasImage,
+  hasVideo,
+  hasFile,
+  hasVoice,
+  getFileName,
   type AuthResult,
   type WeixinConfig,
   type WeixinMessage,
@@ -16,8 +23,6 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUTH_FILE = path.join(__dirname, '.weixin-auth.json');
-const DEFAULT_BASE_URL = process.env.WEIXIN_BASE_URL ?? 'https://ilinkai.weixin.qq.com';
-const DEFAULT_CDN_BASE_URL = process.env.WEIXIN_CDN_URL ?? 'https://novac2c.cdn.weixin.qq.com/c2c';
 
 type SavedAuth = {
   token: string;
@@ -50,47 +55,6 @@ function clearAuth(): void {
     fs.unlinkSync(AUTH_FILE);
     console.log('[Auth] Cleared cached auth');
   }
-}
-
-function extractText(message: WeixinMessage): string {
-  for (const item of message.item_list ?? []) {
-    if (item.type === MessageItemType.TEXT && item.text_item?.text) {
-      return item.text_item.text;
-    }
-    if (item.type === MessageItemType.VOICE && item.voice_item?.text) {
-      return item.voice_item.text;
-    }
-  }
-
-  return '';
-}
-
-function hasImage(message: WeixinMessage): boolean {
-  return Boolean(
-    message.item_list?.some((item) => item.type === MessageItemType.IMAGE && item.image_item?.media?.encrypt_query_param)
-  );
-}
-
-function hasVideo(message: WeixinMessage): boolean {
-  return Boolean(
-    message.item_list?.some((item) => item.type === MessageItemType.VIDEO && item.video_item?.media?.encrypt_query_param)
-  );
-}
-
-function hasFile(message: WeixinMessage): boolean {
-  return Boolean(
-    message.item_list?.some((item) => item.type === MessageItemType.FILE && item.file_item?.media?.encrypt_query_param)
-  );
-}
-
-function hasVoice(message: WeixinMessage): boolean {
-  return Boolean(
-    message.item_list?.some((item) => item.type === MessageItemType.VOICE && item.voice_item?.media?.encrypt_query_param)
-  );
-}
-
-function getFirstFileName(message: WeixinMessage): string | undefined {
-  return message.item_list?.find((item) => item.type === MessageItemType.FILE)?.file_item?.file_name;
 }
 
 async function createSdk(): Promise<WeixinSDK> {
@@ -146,11 +110,7 @@ async function main(): Promise<void> {
   sdk.onMessage((message) => {
     const from = message.from_user_id;
     const contextToken = message.context_token;
-    const text = extractText(message);
-    const hasInboundImage = hasImage(message);
-    const hasInboundVideo = hasVideo(message);
-    const hasInboundFile = hasFile(message);
-    const hasInboundVoice = hasVoice(message);
+    const text = getMessageText(message);
 
     if (!from || !contextToken) {
       console.log('[Echo] Ignoring message without from/context_token');
@@ -165,7 +125,7 @@ async function main(): Promise<void> {
       });
     }
 
-    if (hasInboundImage) {
+    if (hasImage(message)) {
       void (async () => {
         const downloaded = await sdk.media.downloader.downloadFirstMedia(message);
         if (!downloaded || downloaded.type !== 'image') {
@@ -188,7 +148,7 @@ async function main(): Promise<void> {
       });
     }
 
-    if (hasInboundVideo) {
+    if (hasVideo(message)) {
       void (async () => {
         const downloaded = await sdk.media.downloader.downloadVideo(message);
         if (!downloaded) {
@@ -211,7 +171,7 @@ async function main(): Promise<void> {
       });
     }
 
-    if (hasInboundFile) {
+    if (hasFile(message)) {
       void (async () => {
         const downloaded = await sdk.media.downloader.downloadFile(message);
         if (!downloaded) {
@@ -223,7 +183,7 @@ async function main(): Promise<void> {
           await sdk.messaging.sender.sendMedia({
             to: from,
             filePath: downloaded.path,
-            fileName: getFirstFileName(message),
+            fileName: getFileName(message),
             mediaType: UploadMediaType.FILE,
             contextToken,
           });
@@ -235,7 +195,7 @@ async function main(): Promise<void> {
       });
     }
 
-    if (hasInboundVoice) {
+    if (hasVoice(message)) {
       void (async () => {
         const downloaded = await sdk.media.downloader.downloadVoice(message);
         if (!downloaded) {

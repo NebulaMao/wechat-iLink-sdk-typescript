@@ -32,7 +32,7 @@ describe('WeixinSDK', () => {
     it('should create SDK with valid config and auth', () => {
       sdk = new WeixinSDK({ config, auth });
       expect(sdk).toBeDefined();
-      expect(sdk.config).toBe(config);
+      expect(sdk.config).toEqual(expect.objectContaining(config));
       expect(sdk.auth).toBe(auth);
     });
 
