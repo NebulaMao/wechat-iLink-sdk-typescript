@@ -1,20 +1,22 @@
-# @xmccln/wechat-ilink-sdk
+# wechat-ilink-sdk
 
 TypeScript SDK for the WeChat iLink bot protocol.
 
 [中文文档](./README.zh-CN.md)
 
 It includes:
-- QR login and token login
-- `getupdates` long-poll receive loop
-- text and media sending
-- CDN upload
-- inbound media download and decryption
+- QR login and token-based authentication
+- `getupdates` long-polling receive loop with automatic cursor management
+- Text and media sending (image, video, file, voice)
+- CDN upload with AES-128-ECB encryption
+- Inbound media download and AES decryption
+
+Zero runtime dependencies — uses only Node.js built-ins (`crypto`, `fs`, `path`, `os`, `fetch`).
 
 ## Install
 
 ```bash
-npm install @xmccln/wechat-ilink-sdk
+npm install wechat-ilink-sdk
 ```
 
 ## Quick Start
@@ -24,12 +26,10 @@ import {
   WeixinSDK,
   TokenAuthProvider,
   LogLevel,
-} from '@xmccln/wechat-ilink-sdk';
+} from 'wechat-ilink-sdk';
 
 const sdk = new WeixinSDK({
   config: {
-    baseUrl: process.env.WEIXIN_BASE_URL ?? 'https://ilinkai.weixin.qq.com',
-    cdnBaseUrl: process.env.WEIXIN_CDN_URL ?? 'https://novac2c.cdn.weixin.qq.com/c2c',
     timeout: 15000,
     longPollTimeoutMs: 35000,
     pollingInterval: 1000,
@@ -45,47 +45,97 @@ const sdk = new WeixinSDK({
 
 sdk.onMessage((message) => {
   console.log('from:', message.from_user_id);
-  console.log('context:', message.context_token);
+  console.log('text:', message.item_list?.[0]?.text_item?.text);
 });
 
 await sdk.start();
 await sdk.sendText('target-user-id', 'hello');
 ```
 
-Default values used by the SDK examples:
-
+Default values:
 - API base URL: `https://ilinkai.weixin.qq.com`
 - CDN base URL: `https://novac2c.cdn.weixin.qq.com/c2c`
 - QR login `bot_type`: `3`
 
-## QR Login
+## Authentication
+
+### Token Auth
+
+Use a pre-obtained bot token:
 
 ```ts
-import {
-  WeixinSDK,
-  QrAuthProvider,
-  ApiClient,
-} from '@xmccln/wechat-ilink-sdk';
+import { WeixinSDK, TokenAuthProvider } from 'wechat-ilink-sdk';
 
-const config = {
-  baseUrl: 'https://ilinkai.weixin.qq.com',
-  cdnBaseUrl: 'https://novac2c.cdn.weixin.qq.com/c2c',
-};
+const sdk = new WeixinSDK({
+  auth: new TokenAuthProvider(
+    process.env.WEIXIN_TOKEN!,
+    process.env.WEIXIN_USER_ID
+  ),
+  config: {},
+});
+```
 
-const apiClient = new ApiClient(config);
-const auth = new QrAuthProvider(apiClient, '3');
+### QR Login
+
+```ts
+import { WeixinSDK, QrAuthProvider } from 'wechat-ilink-sdk';
+
+const auth = QrAuthProvider.fromConfig({}, '3');
 
 auth.on('qr_generated', ({ url }) => {
-  console.log('scan:', url);
+  console.log('Open this URL to scan QR code:', url);
 });
 
-const sdk = new WeixinSDK({ config, auth });
+auth.on('qr_scanned', () => {
+  console.log('QR code scanned, waiting for confirmation...');
+});
+
+const sdk = new WeixinSDK({ config: {}, auth });
 await sdk.start();
 ```
 
-## Replying Correctly
+### Token Persistence
 
-Replies should carry the inbound `context_token`.
+```ts
+import { FileTokenStore, QrAuthProvider } from 'wechat-ilink-sdk';
+
+const tokenStore = new FileTokenStore('./token.json');
+const cached = tokenStore.load();
+
+if (cached) {
+  const sdk = new WeixinSDK({
+    config: {},
+    auth: new TokenAuthProvider(cached.token, cached.userId),
+  });
+} else {
+  const auth = QrAuthProvider.fromConfig({});
+  // ... QR login flow, then save:
+  const result = await auth.authenticate();
+  tokenStore.save({ token: result.token, userId: result.userId });
+}
+```
+
+## Receiving Messages
+
+```ts
+sdk.onMessage((message) => {
+  const text = message.item_list?.[0]?.text_item?.text;
+  console.log(`[${message.from_user_id}]: ${text}`);
+});
+```
+
+The `WeixinMessage` type contains:
+- `from_user_id` / `to_user_id` — sender and receiver
+- `context_token` — required for replies
+- `item_list` — array of `MessageItem` (text, image, voice, file, video)
+- `message_type` — `MessageType.USER` or `MessageType.BOT`
+- `session_id` / `group_id` — conversation identifiers
+
+## Sending Messages
+
+### Reply to a Message
+
+Replies should carry the inbound `context_token`:
 
 ```ts
 sdk.onMessage(async (message) => {
@@ -97,82 +147,130 @@ sdk.onMessage(async (message) => {
 });
 ```
 
-## Sending Media
+### Send Text
 
 ```ts
-import { UploadMediaType } from '@xmccln/wechat-ilink-sdk';
-
-await sdk.messaging.sender.sendMedia({
-  to: 'target-user-id',
-  filePath: '/tmp/demo.png',
-  mediaType: UploadMediaType.IMAGE,
-  contextToken: 'message-context-token',
-});
+await sdk.sendText('target-user-id', 'Hello!', 'optional-context-token');
 ```
 
-Supported `UploadMediaType` values:
+### Send Media
 
-- `UploadMediaType.IMAGE`
-- `UploadMediaType.VIDEO`
-- `UploadMediaType.FILE`
-- `UploadMediaType.VOICE`
-
-For file messages, you can also pass `fileName`:
+The SDK provides convenience methods for each media type:
 
 ```ts
-await sdk.messaging.sender.sendMedia({
-  to: 'target-user-id',
-  filePath: '/tmp/report.bin',
+// Send image
+await sdk.sendImage('target-user-id', '/tmp/photo.png', {
+  contextToken: 'message-context-token',
+});
+
+// Send video
+await sdk.sendVideo('target-user-id', '/tmp/clip.mp4', {
+  contextToken: 'message-context-token',
+});
+
+// Send file (with optional custom filename)
+await sdk.sendFile('target-user-id', '/tmp/report.bin', {
   fileName: 'report.pdf',
-  mediaType: UploadMediaType.FILE,
+  contextToken: 'message-context-token',
+});
+
+// Send voice
+await sdk.sendVoice('target-user-id', '/tmp/audio.silk', {
   contextToken: 'message-context-token',
 });
 ```
 
-## Downloading And Decrypting Inbound Media
-
-The SDK now handles inbound CDN download and AES decryption for you.
+Or use the generic `sendMedia` method:
 
 ```ts
-const downloaded = await sdk.media.downloader.downloadFirstMedia(message);
-if (!downloaded) return;
-
-console.log(downloaded.type);
-console.log(downloaded.path);
-console.log(downloaded.mimeType);
-
-await downloaded.cleanup();
+await sdk.sendMedia('target-user-id', '/tmp/photo.png', 'image', {
+  contextToken: 'message-context-token',
+});
 ```
 
-Available helpers:
+Supported media types: `'image'`, `'video'`, `'file'`, `'voice'`.
 
-- `sdk.media.downloader.downloadImage(message)`
-- `sdk.media.downloader.downloadVideo(message)`
-- `sdk.media.downloader.downloadFile(message)`
-- `sdk.media.downloader.downloadVoice(message)`
-- `sdk.media.downloader.downloadFirstMedia(message)`
+### Send Typing Indicator
 
-Current downloader behavior:
+```ts
+import { ApiEndpoints, TypingStatus } from 'wechat-ilink-sdk';
 
-- image: downloads and decrypts to a local file
-- video: downloads and decrypts to a local file
-- file: downloads and decrypts to a local file, infers MIME from filename
-- voice: downloads and decrypts to a local file, currently saved as raw `audio/silk`
+const endpoints = new ApiEndpoints(apiClient);
+
+// Get typing ticket first
+const config = await endpoints.getConfig({ ilink_user_id: 'user-id' });
+
+// Send typing indicator
+await endpoints.sendTyping({
+  ilink_user_id: 'target-user-id',
+  typing_ticket: config.typing_ticket,
+  status: TypingStatus.TYPING,
+});
+```
+
+## Downloading Inbound Media
+
+Download and decrypt media from received messages:
+
+```ts
+sdk.onMessage(async (message) => {
+  const downloaded = await sdk.downloadMedia(message);
+  if (!downloaded) return;
+
+  console.log(downloaded.type);    // 'image' | 'video' | 'file' | 'voice'
+  console.log(downloaded.path);    // local file path
+  console.log(downloaded.mimeType);
+
+  // Clean up temp file when done
+  await downloaded.cleanup();
+});
+```
+
+You can also specify an output path or download a specific media type:
+
+```ts
+// Download to a specific path
+const result = await sdk.media.downloader.downloadImage(message, {
+  outputPath: '/tmp/photo.png',
+});
+
+// Download specific media type
+await sdk.media.downloader.downloadVideo(message);
+await sdk.media.downloader.downloadVoice(message);
+await sdk.media.downloader.downloadFile(message);
+```
+
+### Media Helper Functions
+
+```ts
+import {
+  getMessageText,
+  hasImage,
+  hasVideo,
+  hasVoice,
+  hasFile,
+  getFileName,
+} from 'wechat-ilink-sdk';
+
+// Extract text from a message (supports text and voice-to-text)
+const text = getMessageText(message);
+
+// Check for specific media types
+if (hasImage(message)) { /* ... */ }
+if (hasVideo(message)) { /* ... */ }
+
+// Get file name from file messages
+const name = getFileName(message);
+```
 
 ## Echo Bot
 
 An end-to-end example is included at [examples/echo-bot.ts](./examples/echo-bot.ts).
 
-It supports:
-
+Features:
 - QR login with local token cache
-- text echo
-- image echo
-- video echo
-- file echo
-- voice echo
-
-Run it with:
+- Text echo
+- Image/video/file/voice echo
 
 ```bash
 npx tsx examples/echo-bot.ts
@@ -188,37 +286,70 @@ npx tsx examples/echo-bot.ts --clear-auth
 
 ```ts
 import {
+  // Core
   WeixinSDK,
-  ApiClient,
-  ApiEndpoints,
-  TokenAuthProvider,
-  QrAuthProvider,
-  MessageSender,
-  MessageReceiver,
-  MediaUploader,
-  MediaDownloader,
-  UploadMediaType,
-  MessageItemType,
-  MessageType,
-  TypingStatus,
   LogLevel,
   WeixinSDKError,
   ErrorCode,
-} from '@xmccln/wechat-ilink-sdk';
+
+  // API
+  ApiClient,
+  ApiEndpoints,
+
+  // Auth
+  TokenAuthProvider,
+  QrAuthProvider,
+  FileTokenStore,
+
+  // Messaging
+  MessageSender,
+  MessageReceiver,
+
+  // Media
+  MediaUploader,
+  MediaDownloader,
+
+  // Crypto utilities
+  aesEncrypt,
+  aesDecrypt,
+  md5,
+  generateAesKey,
+
+  // Types
+  type WeixinConfig,
+  type WeixinMessage,
+  type MessageItem,
+  type DownloadedMedia,
+  UploadMediaType,
+  MessageType,
+  MessageItemType,
+  MessageState,
+  TypingStatus,
+} from 'wechat-ilink-sdk';
 ```
 
 ## Config
 
 `WeixinConfig` fields:
 
-- `baseUrl`: iLink API base URL
-- `cdnBaseUrl`: CDN base URL
-- `timeout`: normal API timeout in ms
-- `longPollTimeoutMs`: `getupdates` long-poll timeout in ms
-- `retries`: retry count for retryable requests
-- `pollingInterval`: fallback delay between polls
-- `logLevel`
-- `enableConsoleLog`
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `baseUrl` | `string` | `https://ilinkai.weixin.qq.com` | iLink API base URL |
+| `cdnBaseUrl` | `string` | `https://novac2c.cdn.weixin.qq.com/c2c` | CDN base URL |
+| `timeout` | `number` | `30000` | Normal API timeout (ms) |
+| `longPollTimeoutMs` | `number` | `35000` | `getupdates` long-poll timeout (ms) |
+| `retries` | `number` | `3` | Retry count for retryable requests |
+| `pollingInterval` | `number` | `30000` | Fallback delay between polls (ms) |
+| `logLevel` | `LogLevel` | `LogLevel.INFO` | Log verbosity |
+| `enableConsoleLog` | `boolean` | `true` | Print logs to console |
+
+## Key Protocol Details
+
+- All API requests are JSON POST; CDN upload/download is binary.
+- Media encryption: AES-128-ECB with random 16-byte key (32 hex chars).
+- `get_updates_buf` is a cursor preserved across polls; reset on `errcode === -14` (session timeout).
+- iLink v2.1+ returns `upload_full_url` instead of `upload_param` — the uploader handles both.
+- The receiver automatically uses `longpolling_timeout_ms` from the server response to adjust polling interval.
 
 ## Development
 
@@ -228,3 +359,7 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## License
+
+MIT
